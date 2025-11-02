@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Test</title>
+</head>
+<body>
+    <h1>Storage Test</h1>
+    <button onclick="testStorage()">Test Storage</button>
+    <div id="results"></div>
+
+    <script>
+        // Copy the Task class and StorageManager from script.js for testing
+        class Task {
+            constructor(text) {
+                this.id = this.generateId();
+                this.text = text;
+                this.completed = false;
+                this.createdAt = new Date().toISOString();
+            }
+
+            generateId() {
+                return 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            }
+        }
+
+        class StorageManager {
+            constructor() {
+                this.storageKey = 'todoTasks';
+                this.isStorageAvailable = this.checkStorageAvailability();
+            }
+
+            checkStorageAvailability() {
+                try {
+                    const testKey = '__storage_test__';
+                    localStorage.setItem(testKey, 'test');
+                    localStorage.removeItem(testKey);
+                    return true;
+                } catch (error) {
+                    console.warn('localStorage is not available:', error.message);
+                    return false;
+                }
+            }
+
+            saveTasks(tasks) {
+                if (!this.isStorageAvailable) {
+                    console.warn('Cannot save tasks: localStorage is not available');
+                    return false;
+                }
+
+                try {
+                    const tasksData = JSON.stringify(tasks);
+                    localStorage.setItem(this.storageKey, tasksData);
+                    return true;
+                } catch (error) {
+                    console.error('Failed to save tasks to localStorage:', error.message);
+                    return false;
+                }
+            }
+
+            loadTasks() {
+                if (!this.isStorageAvailable) {
+                    console.warn('Cannot load tasks: localStorage is not available');
+                    return null;
+                }
+
+                try {
+                    const tasksData = localStorage.getItem(this.storageKey);
+                    
+                    if (!tasksData) {
+                        return [];
+                    }
+
+                    const parsedTasks = JSON.parse(tasksData);
+                    
+                    if (!Array.isArray(parsedTasks)) {
+                        console.warn('Invalid tasks data format in localStorage');
+                        return null;
+                    }
+
+                    const validTasks = parsedTasks
+                        .filter(taskData => this.isValidTaskData(taskData))
+                        .map(taskData => this.reconstructTask(taskData));
+
+                    return validTasks;
+                } catch (error) {
+                    console.error('Failed to load tasks from localStorage:', error.message);
+                    return null;
+                }
+            }
+
+            isValidTaskData(taskData) {
+                return (
+                    taskData &&
+                    typeof taskData === 'object' &&
+                    typeof taskData.id === 'string' &&
+                    typeof taskData.text === 'string' &&
+                    typeof taskData.completed === 'boolean' &&
+                    typeof taskData.createdAt === 'string'
+                );
+            }
+
+            reconstructTask(taskData) {
+                const task = Object.create(Task.prototype);
+                task.id = taskData.id;
+                task.text = taskData.text;
+                task.completed = taskData.completed;
+                task.createdAt = taskData.createdAt;
+                return task;
+            }
+
+            clearTasks() {
+                if (!this.isStorageAvailable) {
+                    return false;
+                }
+                try {
+                    localStorage.removeItem(this.storageKey);
+                    return true;
+                } catch (error) {
+                    console.error('Failed to clear tasks from localStorage:', error.message);
+                    return false;
+                }
+            }
+        }
+
+        function testStorage() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>Testing Storage...</h2>';
+            
+            const storageManager = new StorageManager();
+            
+            // Test 1: Create tasks
+            const task1 = new Task('Test task 1');
+            const task2 = new Task('Test task 2');
+            task2.completed = true;
+            
+            const tasks = [task1, task2];
+            
+            // Test 2: Save tasks
+            const saveResult = storageManager.saveTasks(tasks);
+            results.innerHTML += `<p>Save test: ${saveResult ? 'PASS' : 'FAIL'}</p>`;
+            
+            // Test 3: Load tasks
+            const loadedTasks = storageManager.loadTasks();
+            const loadResult = loadedTasks && loadedTasks.length === 2;
+            results.innerHTML += `<p>Load test: ${loadResult ? 'PASS' : 'FAIL'}</p>`;
+            
+            if (loadedTasks) {
+                results.innerHTML += `<p>Loaded ${loadedTasks.length} tasks:</p>`;
+                loadedTasks.forEach(task => {
+                    results.innerHTML += `<p>- ${task.text} (${task.completed ? 'completed' : 'pending'})</p>`;
+                });
+            }
+            
+            // Test 4: Clear tasks
+            const clearResult = storageManager.clearTasks();
+            results.innerHTML += `<p>Clear test: ${clearResult ? 'PASS' : 'FAIL'}</p>`;
+            
+            // Test 5: Load after clear
+            const emptyLoad = storageManager.loadTasks();
+            const emptyResult = emptyLoad && emptyLoad.length === 0;
+            results.innerHTML += `<p>Empty load test: ${emptyResult ? 'PASS' : 'FAIL'}</p>`;
+            
+            results.innerHTML += '<h3>All storage tests completed!</h3>';
+        }
+    </script>
+</body>
+</html>

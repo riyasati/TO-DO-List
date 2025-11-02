@@ -50,6 +50,12 @@
   /* Transitions */
   --transition-fast: 150ms ease-in-out;
   --transition-normal: 250ms ease-in-out;
+  --transition-slow: 400ms ease-in-out;
+  
+  /* Animation Durations */
+  --animation-fast: 200ms;
+  --animation-normal: 300ms;
+  --animation-slow: 500ms;
 }
 
 /* CSS Reset and Base Styles */
@@ -227,13 +233,14 @@ eader Styling */
 .add-button:hover {
   background-color: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: var(--shadow-lg);
 }
 
 .add-button:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.98);
   box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
 }
 
 .add-button:focus {
@@ -263,25 +270,45 @@ sk List Section */
   background-color: var(--color-background);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  transition: all var(--transition-fast);
+  transition: all var(--transition-normal), transform var(--transition-fast);
   cursor: pointer;
   position: relative;
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 .task-item:hover {
   border-color: var(--color-primary);
-  box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px) scale(1.01);
 }
 
 .task-item.completed {
   background-color: var(--color-secondary);
   border-color: var(--color-success);
+  transform: translateY(0) scale(0.98);
 }
 
 .task-item.completed .task-text {
   text-decoration: line-through;
   color: var(--color-text-light);
+}
+
+/* Task Item Animation States */
+.task-item.task-entering {
+  animation: taskSlideIn var(--animation-normal) ease-out forwards;
+}
+
+.task-item.task-removing {
+  animation: taskSlideOut var(--animation-fast) ease-in forwards;
+}
+
+.task-item.task-completing {
+  animation: taskComplete var(--animation-normal) ease-out forwards;
+}
+
+.task-item.task-uncompleting {
+  animation: taskUncomplete var(--animation-normal) ease-out forwards;
 }
 
 /* Task Checkbox */
@@ -294,18 +321,22 @@ sk List Section */
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-fast);
+  transition: all var(--transition-normal);
   flex-shrink: 0;
   cursor: pointer;
+  position: relative;
 }
 
 .task-checkbox:hover {
   border-color: var(--color-primary);
+  transform: scale(1.1);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .task-item.completed .task-checkbox {
   background-color: var(--color-success);
   border-color: var(--color-success);
+  animation: checkboxPop var(--animation-fast) ease-out;
 }
 
 .task-checkbox::after {
@@ -314,13 +345,13 @@ sk List Section */
   font-size: var(--font-size-sm);
   font-weight: bold;
   opacity: 0;
-  transform: scale(0.5);
-  transition: all var(--transition-fast);
+  transform: scale(0.3) rotate(-10deg);
+  transition: all var(--transition-normal);
 }
 
 .task-item.completed .task-checkbox::after {
   opacity: 1;
-  transform: scale(1);
+  transform: scale(1) rotate(0deg);
 }
 
 /* Task Text */
@@ -343,25 +374,26 @@ sk List Section */
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-fast);
+  transition: all var(--transition-normal);
   flex-shrink: 0;
   opacity: 0;
-  transform: scale(0.8);
+  transform: scale(0.7) rotate(0deg);
 }
 
 .task-item:hover .delete-button {
   opacity: 1;
-  transform: scale(1);
+  transform: scale(1) rotate(0deg);
 }
 
 .delete-button:hover {
   background-color: var(--color-danger);
   color: white;
-  transform: scale(1.1);
+  transform: scale(1.15) rotate(90deg);
+  box-shadow: var(--shadow-md);
 }
 
 .delete-button:active {
-  transform: scale(0.95);
+  transform: scale(0.95) rotate(90deg);
 }
 
 .delete-button::before {
@@ -369,6 +401,7 @@ sk List Section */
   font-size: var(--font-size-xl);
   font-weight: bold;
   line-height: 1;
+  transition: transform var(--transition-fast);
 }
 
 /* Empty State */
@@ -376,19 +409,166 @@ sk List Section */
   text-align: center;
   padding: var(--space-12) var(--space-6);
   color: var(--color-text-light);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all var(--transition-slow);
+}
+
+.empty-state__icon {
+  font-size: 4rem;
+  margin-bottom: var(--space-4);
+  opacity: 0.7;
+}
+
+.empty-state__title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--space-3);
 }
 
 .empty-state__message {
-  font-size: var(--font-size-lg);
-  margin-bottom: 0;
+  font-size: var(--font-size-base);
+  margin-bottom: var(--space-6);
+  max-width: 300px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: var(--line-height-relaxed);
+}
+
+.empty-state__tips {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 350px;
+  margin: 0 auto;
+}
+
+.empty-state__tip {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-light);
+  margin: 0;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  background-color: rgba(37, 99, 235, 0.05);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-primary);
+}
+
+/* Task Summary */
+.task-summary {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all var(--transition-normal);
+}
+
+.task-summary[aria-hidden="false"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.task-summary[aria-hidden="true"] {
+  display: none;
+}
+
+.task-summary__text {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-light);
+  text-align: center;
+  font-weight: 500;
 }
 
 .empty-state[aria-hidden="true"] {
   display: none;
+  opacity: 0;
+  transform: translateY(20px);
 }
 
 .empty-state[aria-hidden="false"] {
   display: block;
+  opacity: 1;
+  transform: translateY(0);
+  animation: fadeInUp var(--animation-normal) ease-out;
+}
+
+/* User Feedback Notifications */
+.feedback-container {
+  position: fixed;
+  top: var(--space-6);
+  right: var(--space-6);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  pointer-events: none;
+}
+
+.feedback-message {
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  box-shadow: var(--shadow-lg);
+  max-width: 300px;
+  opacity: 0;
+  transform: translateX(100%) scale(0.95);
+  transition: all var(--transition-normal);
+  pointer-events: auto;
+}
+
+.feedback-message.feedback-message--show {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
+.feedback-message.feedback-message--success {
+  border-color: var(--color-success);
+  background-color: #f0fdf4;
+}
+
+.feedback-message.feedback-message--error {
+  border-color: var(--color-danger);
+  background-color: #fef2f2;
+}
+
+.feedback-message.feedback-message--info {
+  border-color: var(--color-primary);
+  background-color: #eff6ff;
+}
+
+.feedback-message__content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.feedback-message__icon {
+  font-size: var(--font-size-lg);
+  flex-shrink: 0;
+}
+
+.feedback-message__text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.feedback-message--success .feedback-message__icon {
+  color: var(--color-success);
+}
+
+.feedback-message--error .feedback-message__icon {
+  color: var(--color-danger);
+}
+
+.feedback-message--info .feedback-message__icon {
+  color: var(--color-primary);
 }/* Respons
 ive Design and Mobile Optimization */
 
@@ -494,6 +674,17 @@ ive Design and Mobile Optimization */
   .empty-state__message {
     font-size: var(--font-size-base);
   }
+  
+  /* Feedback notifications on mobile */
+  .feedback-container {
+    top: var(--space-4);
+    right: var(--space-4);
+    left: var(--space-4);
+  }
+  
+  .feedback-message {
+    max-width: none;
+  }
 }
 
 /* Extra small mobile devices */
@@ -528,6 +719,109 @@ ive Design and Mobile Optimization */
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Keyframe Animations */
+@keyframes taskSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+  50% {
+    opacity: 0.7;
+    transform: translateY(-5px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    max-height: 200px;
+    padding-top: var(--space-4);
+    padding-bottom: var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+}
+
+@keyframes taskSlideOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    max-height: 200px;
+    padding-top: var(--space-4);
+    padding-bottom: var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+  50% {
+    opacity: 0.3;
+    transform: translateY(-10px) scale(0.95);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.9);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+}
+
+@keyframes taskComplete {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+    background-color: var(--color-success);
+    border-color: var(--color-success);
+  }
+  100% {
+    transform: scale(0.98);
+    background-color: var(--color-secondary);
+    border-color: var(--color-success);
+  }
+}
+
+@keyframes taskUncomplete {
+  0% {
+    transform: scale(0.98);
+    background-color: var(--color-secondary);
+  }
+  50% {
+    transform: scale(1.02);
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+  }
+  100% {
+    transform: scale(1);
+    background-color: var(--color-background);
+    border-color: var(--color-border);
+  }
+}
+
+@keyframes checkboxPop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

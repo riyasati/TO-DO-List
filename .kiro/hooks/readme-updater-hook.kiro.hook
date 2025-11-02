@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "README Updater",
+  "description": "Automatically updates the README.md file when project files are modified to keep documentation in sync with code changes",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "index.html",
+      "script.js",
+      "styles.css",
+      "test-storage.html"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "The project files have been updated. Please review the current state of the todo list application and update the README.md file to reflect any changes in functionality, features, or implementation details. Make sure the README accurately describes the current application state and includes any new features or modifications."
+  }
+}

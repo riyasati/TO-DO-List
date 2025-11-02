@@ -24,11 +24,12 @@ class Task {
 }
 
 /**
- * Task Manager - handles all task operations
+ * Task Manager - handles all task operations with storage integration
  */
 class TaskManager {
-    constructor() {
+    constructor(storageManager) {
         this.tasks = [];
+        this.storageManager = storageManager;
     }
 
     /**
@@ -43,6 +44,10 @@ class TaskManager {
         
         const task = new Task(text.trim());
         this.tasks.push(task);
+        
+        // Save to storage after adding
+        this.saveToStorage();
+        
         return task;
     }
 
@@ -55,6 +60,10 @@ class TaskManager {
         const task = this.tasks.find(t => t.id === taskId);
         if (task) {
             task.completed = !task.completed;
+            
+            // Save to storage after toggling
+            this.saveToStorage();
+            
             return task;
         }
         return null;
@@ -69,6 +78,10 @@ class TaskManager {
         const index = this.tasks.findIndex(t => t.id === taskId);
         if (index !== -1) {
             this.tasks.splice(index, 1);
+            
+            // Save to storage after deleting
+            this.saveToStorage();
+            
             return true;
         }
         return false;
@@ -96,11 +109,275 @@ class TaskManager {
      */
     clearAllTasks() {
         this.tasks = [];
+        
+        // Clear storage when clearing all tasks
+        this.storageManager.clearTasks();
+    }
+
+    /**
+     * Save current tasks to storage
+     * @returns {boolean} True if save was successful
+     */
+    saveToStorage() {
+        if (!this.storageManager) {
+            console.warn('No storage manager available');
+            return false;
+        }
+        
+        return this.storageManager.saveTasks(this.tasks);
+    }
+
+    /**
+     * Load tasks from storage and replace current tasks
+     * @returns {boolean} True if load was successful
+     */
+    loadFromStorage() {
+        if (!this.storageManager) {
+            console.warn('No storage manager available');
+            return false;
+        }
+        
+        const loadedTasks = this.storageManager.loadTasks();
+        
+        if (loadedTasks !== null) {
+            this.tasks = loadedTasks;
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * Initialize tasks by loading from storage
+     * This should be called when the application starts
+     * @returns {boolean} True if initialization was successful
+     */
+    initializeTasks() {
+        const loadSuccess = this.loadFromStorage();
+        
+        if (loadSuccess && this.tasks.length > 0) {
+            console.log(`Loaded ${this.tasks.length} tasks from storage`);
+            // Show feedback for restored tasks
+            setTimeout(() => {
+                feedbackManager.showMessage(`Restored ${this.tasks.length} task${this.tasks.length === 1 ? '' : 's'} from previous session`, 'info', 2500);
+            }, 500); // Delay to allow UI to initialize
+        } else {
+            console.log('Starting with empty task list');
+            this.tasks = [];
+        }
+        
+        return loadSuccess;
+    }
+
+    /**
+     * Get storage manager instance
+     * @returns {StorageManager} The storage manager
+     */
+    getStorageManager() {
+        return this.storageManager;
     }
 }
 
-// Initialize the task manager
-const taskManager = new TaskManager();
+/**
+ * Storage Manager - handles localStorage operations with error handling
+ */
+class StorageManager {
+    constructor() {
+        this.storageKey = 'todoTasks';
+        this.isStorageAvailable = this.checkStorageAvailability();
+    }
+
+    /**
+     * Check if localStorage is available and working
+     * @returns {boolean} True if localStorage is available
+     */
+    checkStorageAvailability() {
+        try {
+            const testKey = '__storage_test__';
+            localStorage.setItem(testKey, 'test');
+            localStorage.removeItem(testKey);
+            return true;
+        } catch (error) {
+            console.warn('localStorage is not available:', error.message);
+            return false;
+        }
+    }
+
+    /**
+     * Save tasks to localStorage
+     * @param {Task[]} tasks - Array of tasks to save
+     * @returns {boolean} True if save was successful
+     */
+    saveTasks(tasks) {
+        if (!this.isStorageAvailable) {
+            console.warn('Cannot save tasks: localStorage is not available');
+            return false;
+        }
+
+        try {
+            const tasksData = JSON.stringify(tasks);
+            localStorage.setItem(this.storageKey, tasksData);
+            return true;
+        } catch (error) {
+            console.error('Failed to save tasks to localStorage:', error.message);
+            
+            // Handle quota exceeded error
+            if (error.name === 'QuotaExceededError') {
+                console.error('localStorage quota exceeded. Consider clearing old data.');
+            }
+            
+            return false;
+        }
+    }
+
+    /**
+     * Load tasks from localStorage
+     * @returns {Task[]|null} Array of tasks or null if loading failed
+     */
+    loadTasks() {
+        if (!this.isStorageAvailable) {
+            console.warn('Cannot load tasks: localStorage is not available');
+            return null;
+        }
+
+        try {
+            const tasksData = localStorage.getItem(this.storageKey);
+            
+            if (!tasksData) {
+                // No data found, return empty array
+                return [];
+            }
+
+            const parsedTasks = JSON.parse(tasksData);
+            
+            // Validate that the parsed data is an array
+            if (!Array.isArray(parsedTasks)) {
+                console.warn('Invalid tasks data format in localStorage');
+                return null;
+            }
+
+            // Validate and reconstruct Task objects
+            const validTasks = parsedTasks
+                .filter(taskData => this.isValidTaskData(taskData))
+                .map(taskData => this.reconstructTask(taskData));
+
+            return validTasks;
+        } catch (error) {
+            console.error('Failed to load tasks from localStorage:', error.message);
+            
+            // If JSON parsing failed, the data might be corrupted
+            if (error instanceof SyntaxError) {
+                console.error('localStorage data appears to be corrupted');
+                this.clearTasks(); // Clear corrupted data
+            }
+            
+            return null;
+        }
+    }
+
+    /**
+     * Clear all tasks from localStorage
+     * @returns {boolean} True if clear was successful
+     */
+    clearTasks() {
+        if (!this.isStorageAvailable) {
+            console.warn('Cannot clear tasks: localStorage is not available');
+            return false;
+        }
+
+        try {
+            localStorage.removeItem(this.storageKey);
+            return true;
+        } catch (error) {
+            console.error('Failed to clear tasks from localStorage:', error.message);
+            return false;
+        }
+    }
+
+    /**
+     * Validate task data structure
+     * @param {Object} taskData - Task data to validate
+     * @returns {boolean} True if task data is valid
+     */
+    isValidTaskData(taskData) {
+        return (
+            taskData &&
+            typeof taskData === 'object' &&
+            typeof taskData.id === 'string' &&
+            typeof taskData.text === 'string' &&
+            typeof taskData.completed === 'boolean' &&
+            typeof taskData.createdAt === 'string'
+        );
+    }
+
+    /**
+     * Reconstruct a Task object from stored data
+     * @param {Object} taskData - Raw task data from storage
+     * @returns {Task} Reconstructed Task object
+     */
+    reconstructTask(taskData) {
+        // Create a new task instance and populate it with stored data
+        const task = Object.create(Task.prototype);
+        task.id = taskData.id;
+        task.text = taskData.text;
+        task.completed = taskData.completed;
+        task.createdAt = taskData.createdAt;
+        return task;
+    }
+
+    /**
+     * Get storage availability status
+     * @returns {boolean} True if storage is available
+     */
+    isAvailable() {
+        return this.isStorageAvailable;
+    }
+
+    /**
+     * Get storage usage information (if available)
+     * @returns {Object|null} Storage usage info or null if not available
+     */
+    getStorageInfo() {
+        if (!this.isStorageAvailable) {
+            return null;
+        }
+
+        try {
+            const tasksData = localStorage.getItem(this.storageKey);
+            const dataSize = tasksData ? new Blob([tasksData]).size : 0;
+            
+            return {
+                hasData: !!tasksData,
+                dataSize: dataSize,
+                dataSizeFormatted: this.formatBytes(dataSize)
+            };
+        } catch (error) {
+            console.error('Failed to get storage info:', error.message);
+            return null;
+        }
+    }
+
+    /**
+     * Format bytes to human readable format
+     * @param {number} bytes - Number of bytes
+     * @returns {string} Formatted string
+     */
+    formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+}
+
+// Initialize the storage manager
+const storageManager = new StorageManager();
+
+// Initialize the task manager with storage
+const taskManager = new TaskManager(storageManager);
 // DOM m
 anipulation and rendering functions
 
@@ -116,7 +393,10 @@ class DOMManager {
         // Cache DOM elements for better performance
         this.elements = {
             taskList: this.taskListElement,
-            emptyState: this.emptyStateElement
+            emptyState: this.emptyStateElement,
+            taskSummary: document.getElementById('taskSummary'),
+            completedCount: document.getElementById('completedCount'),
+            totalCount: document.getElementById('totalCount')
         };
     }
 
@@ -131,16 +411,75 @@ class DOMManager {
         
         if (tasks.length === 0) {
             this.showEmptyState();
+            this.hideTaskSummary();
             return;
         }
         
         this.hideEmptyState();
+        this.showTaskSummary();
+        this.updateTaskSummary();
         
-        // Render each task
-        tasks.forEach(task => {
+        // Render each task with staggered animation
+        tasks.forEach((task, index) => {
             const taskElement = this.createTaskElement(task);
             this.elements.taskList.appendChild(taskElement);
+            
+            // Add entrance animation with slight delay for staggered effect
+            setTimeout(() => {
+                taskElement.classList.add('task-entering');
+            }, index * 50);
         });
+    }
+
+    /**
+     * Add a single task with animation
+     * @param {Task} task - The task to add
+     */
+    addTaskWithAnimation(task) {
+        const taskElement = this.createTaskElement(task);
+        
+        // Add to DOM first
+        this.elements.taskList.appendChild(taskElement);
+        
+        // Hide empty state if showing and show summary
+        this.hideEmptyState();
+        this.showTaskSummary();
+        this.updateTaskSummary();
+        
+        // Trigger entrance animation
+        requestAnimationFrame(() => {
+            taskElement.classList.add('task-entering');
+        });
+        
+        return taskElement;
+    }
+
+    /**
+     * Remove a task with animation
+     * @param {string} taskId - The task ID to remove
+     */
+    removeTaskWithAnimation(taskId) {
+        const taskElement = this.elements.taskList.querySelector(`[data-task-id="${taskId}"]`);
+        
+        if (taskElement) {
+            taskElement.classList.add('task-removing');
+            
+            // Remove from DOM after animation completes
+            setTimeout(() => {
+                if (taskElement.parentNode) {
+                    taskElement.parentNode.removeChild(taskElement);
+                }
+                
+                // Show empty state if no tasks left
+                const remainingTasks = this.taskManager.getAllTasks();
+                if (remainingTasks.length === 0) {
+                    this.showEmptyState();
+                    this.hideTaskSummary();
+                } else {
+                    this.updateTaskSummary();
+                }
+            }, 200); // Match animation duration
+        }
     }
 
     /**
@@ -150,25 +489,15 @@ class DOMManager {
      */
     createTaskElement(task) {
         const taskItem = document.createElement('div');
-        taskItem.className = `task-item ${task.completed ? 'task-item--completed' : ''}`;
+        taskItem.className = `task-item ${task.completed ? 'completed' : ''}`;
         taskItem.setAttribute('data-task-id', task.id);
         taskItem.setAttribute('role', 'listitem');
         
         taskItem.innerHTML = `
-            <div class="task-item__content" role="button" tabindex="0" aria-label="Toggle task completion">
-                <div class="task-item__checkbox ${task.completed ? 'task-item__checkbox--checked' : ''}">
-                    <svg class="task-item__check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="20,6 9,17 4,12"></polyline>
-                    </svg>
-                </div>
-                <span class="task-item__text">${this.escapeHtml(task.text)}</span>
+            <div class="task-checkbox" role="button" tabindex="0" aria-label="Toggle task completion">
             </div>
-            <button class="task-item__delete" aria-label="Delete task" type="button">
-                <svg class="task-item__delete-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3,6 5,6 21,6"></polyline>
-                    <path d="m19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2"></path>
-                </polyline>
-                </svg>
+            <span class="task-text">${this.escapeHtml(task.text)}</span>
+            <button class="delete-button" aria-label="Delete task" type="button">
             </button>
         `;
         
@@ -184,8 +513,9 @@ class DOMManager {
      * @param {string} taskId - The task ID
      */
     attachTaskEventListeners(taskElement, taskId) {
-        const contentElement = taskElement.querySelector('.task-item__content');
-        const deleteButton = taskElement.querySelector('.task-item__delete');
+        const checkboxElement = taskElement.querySelector('.task-checkbox');
+        const textElement = taskElement.querySelector('.task-text');
+        const deleteButton = taskElement.querySelector('.delete-button');
         
         // Toggle completion on click or Enter/Space key
         const toggleHandler = (event) => {
@@ -196,8 +526,10 @@ class DOMManager {
             }
         };
         
-        contentElement.addEventListener('click', toggleHandler);
-        contentElement.addEventListener('keydown', toggleHandler);
+        // Add toggle handlers to both checkbox and text
+        checkboxElement.addEventListener('click', toggleHandler);
+        checkboxElement.addEventListener('keydown', toggleHandler);
+        textElement.addEventListener('click', toggleHandler);
         
         // Delete task on button click
         deleteButton.addEventListener('click', (event) => {
@@ -211,9 +543,30 @@ class DOMManager {
      * @param {string} taskId - The task ID
      */
     handleTaskToggle(taskId) {
+        const taskElement = this.elements.taskList.querySelector(`[data-task-id="${taskId}"]`);
         const updatedTask = this.taskManager.toggleTask(taskId);
-        if (updatedTask) {
-            this.renderTasks();
+        
+        if (updatedTask && taskElement) {
+            // Add animation class based on completion state
+            const animationClass = updatedTask.completed ? 'task-completing' : 'task-uncompleting';
+            taskElement.classList.add(animationClass);
+            
+            // Update the task element state
+            if (updatedTask.completed) {
+                taskElement.classList.add('completed');
+                feedbackManager.showMessage('Task completed! 🎉', 'success', 1500);
+            } else {
+                taskElement.classList.remove('completed');
+                feedbackManager.showMessage('Task marked as incomplete', 'info', 1500);
+            }
+            
+            // Remove animation class after animation completes
+            setTimeout(() => {
+                taskElement.classList.remove(animationClass);
+            }, 300); // Match animation duration
+            
+            // Update task summary
+            this.updateTaskSummary();
         }
     }
 
@@ -222,10 +575,16 @@ class DOMManager {
      * @param {string} taskId - The task ID
      */
     handleTaskDelete(taskId) {
-        const deleted = this.taskManager.deleteTask(taskId);
-        if (deleted) {
-            this.renderTasks();
-        }
+        // Remove with animation first
+        this.removeTaskWithAnimation(taskId);
+        
+        // Show feedback
+        feedbackManager.showMessage('Task deleted', 'info', 1500);
+        
+        // Then delete from data (after a short delay to allow animation to start)
+        setTimeout(() => {
+            this.taskManager.deleteTask(taskId);
+        }, 50);
     }
 
     /**
@@ -245,6 +604,46 @@ class DOMManager {
     }
 
     /**
+     * Show the task summary
+     */
+    showTaskSummary() {
+        this.elements.taskSummary.style.display = 'block';
+        this.elements.taskSummary.setAttribute('aria-hidden', 'false');
+    }
+
+    /**
+     * Hide the task summary
+     */
+    hideTaskSummary() {
+        this.elements.taskSummary.style.display = 'none';
+        this.elements.taskSummary.setAttribute('aria-hidden', 'true');
+    }
+
+    /**
+     * Update the task summary with current counts
+     */
+    updateTaskSummary() {
+        const tasks = this.taskManager.getAllTasks();
+        const completedTasks = tasks.filter(task => task.completed);
+        
+        this.elements.totalCount.textContent = tasks.length;
+        this.elements.completedCount.textContent = completedTasks.length;
+        
+        // Update summary text for better UX
+        const summaryText = this.elements.taskSummary.querySelector('.task-summary__text');
+        if (completedTasks.length === tasks.length && tasks.length > 0) {
+            summaryText.innerHTML = `🎉 All ${tasks.length} task${tasks.length === 1 ? '' : 's'} completed! Great job!`;
+            summaryText.style.color = 'var(--color-success)';
+        } else {
+            summaryText.innerHTML = `<span id="completedCount">${completedTasks.length}</span> of <span id="totalCount">${tasks.length}</span> task${tasks.length === 1 ? '' : 's'} completed`;
+            summaryText.style.color = 'var(--color-text-light)';
+            // Re-cache the elements since we updated innerHTML
+            this.elements.completedCount = document.getElementById('completedCount');
+            this.elements.totalCount = document.getElementById('totalCount');
+        }
+    }
+
+    /**
      * Escape HTML to prevent XSS attacks
      * @param {string} text - The text to escape
      * @returns {string} The escaped text
@@ -255,6 +654,120 @@ class DOMManager {
         return div.innerHTML;
     }
 }
+
+/**
+ * Feedback Manager - handles user feedback notifications
+ */
+class FeedbackManager {
+    constructor() {
+        this.container = document.getElementById('feedbackContainer');
+        this.activeMessages = new Set();
+    }
+
+    /**
+     * Show a feedback message
+     * @param {string} message - The message text
+     * @param {string} type - The message type ('success', 'error', 'info')
+     * @param {number} duration - How long to show the message (ms)
+     */
+    showMessage(message, type = 'info', duration = 3000) {
+        const messageElement = this.createMessageElement(message, type);
+        
+        // Add to container
+        this.container.appendChild(messageElement);
+        this.activeMessages.add(messageElement);
+        
+        // Trigger show animation
+        requestAnimationFrame(() => {
+            messageElement.classList.add('feedback-message--show');
+        });
+        
+        // Auto-remove after duration
+        setTimeout(() => {
+            this.removeMessage(messageElement);
+        }, duration);
+        
+        return messageElement;
+    }
+
+    /**
+     * Create a message element
+     * @param {string} message - The message text
+     * @param {string} type - The message type
+     * @returns {HTMLElement} The message element
+     */
+    createMessageElement(message, type) {
+        const messageEl = document.createElement('div');
+        messageEl.className = `feedback-message feedback-message--${type}`;
+        
+        const icon = this.getIconForType(type);
+        
+        messageEl.innerHTML = `
+            <div class="feedback-message__content">
+                <span class="feedback-message__icon">${icon}</span>
+                <p class="feedback-message__text">${this.escapeHtml(message)}</p>
+            </div>
+        `;
+        
+        return messageEl;
+    }
+
+    /**
+     * Get icon for message type
+     * @param {string} type - The message type
+     * @returns {string} The icon character
+     */
+    getIconForType(type) {
+        const icons = {
+            success: '✓',
+            error: '✕',
+            info: 'ℹ'
+        };
+        return icons[type] || icons.info;
+    }
+
+    /**
+     * Remove a message with animation
+     * @param {HTMLElement} messageElement - The message to remove
+     */
+    removeMessage(messageElement) {
+        if (!this.activeMessages.has(messageElement)) {
+            return;
+        }
+        
+        messageElement.classList.remove('feedback-message--show');
+        
+        setTimeout(() => {
+            if (messageElement.parentNode) {
+                messageElement.parentNode.removeChild(messageElement);
+            }
+            this.activeMessages.delete(messageElement);
+        }, 300); // Match transition duration
+    }
+
+    /**
+     * Clear all messages
+     */
+    clearAll() {
+        this.activeMessages.forEach(message => {
+            this.removeMessage(message);
+        });
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     * @param {string} text - The text to escape
+     * @returns {string} The escaped text
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+}
+
+// Initialize the feedback manager
+const feedbackManager = new FeedbackManager();
 
 // Initialize the DOM manager
 const domManager = new DOMManager(taskManager);/
@@ -323,13 +836,17 @@ class InputManager {
             // Remove any error states
             this.clearInputError();
             
-            // Re-render the task list
-            this.domManager.renderTasks();
+            // Add task with animation
+            this.domManager.addTaskWithAnimation(newTask);
+            
+            // Show success feedback
+            feedbackManager.showMessage('Task added successfully!', 'success', 2000);
             
             // Focus back on input for better UX
             this.elements.input.focus();
         } else {
             this.showInputError('Failed to create task');
+            feedbackManager.showMessage('Failed to create task', 'error');
         }
     }
 
@@ -450,10 +967,13 @@ class InputManager {
  * Initialize the todo application
  */
 function initializeApp() {
+    // Load tasks from storage first
+    taskManager.initializeTasks();
+    
     // Initialize managers
     const inputManager = new InputManager(taskManager, domManager);
     
-    // Initial render
+    // Initial render with loaded tasks
     domManager.renderTasks();
     
     // Focus on input for better UX

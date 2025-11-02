@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A simple, modern todo list application for managing daily tasks">
+    <title>Simple Todo List</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="header__title">Simple Todo List</h1>
+            <p class="header__subtitle">Manage your daily tasks with ease</p>
+        </header>
+
+        <main class="main">
+            <section class="input-section" aria-label="Add new task">
+                <form class="task-form" id="taskForm" role="form" aria-label="New task form">
+                    <div class="input-group">
+                        <label for="taskInput" class="visually-hidden">Enter a new task</label>
+                        <input 
+                            type="text" 
+                            id="taskInput" 
+                            class="task-input" 
+                            placeholder="Enter a new task..." 
+                            maxlength="500"
+                            required
+                        >
+                        <button 
+                            type="submit" 
+                            class="add-button" 
+                            aria-label="Add new task"
+                        >
+                            Add
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="task-list-section" aria-label="Task list">
+                <div class="task-summary" id="taskSummary" style="display: none;">
+                    <p class="task-summary__text">
+                        <span id="completedCount">0</span> of <span id="totalCount">0</span> tasks completed
+                    </p>
+                </div>
+                <div class="task-list" id="taskList" role="list" aria-live="polite">
+                    <!-- Tasks will be dynamically inserted here -->
+                </div>
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-state__icon">📝</div>
+                    <h3 class="empty-state__title">No tasks yet</h3>
+                    <p class="empty-state__message">Add your first task above to get started organizing your day!</p>
+                    <div class="empty-state__tips">
+                        <p class="empty-state__tip">💡 <strong>Tip:</strong> Press Enter to quickly add tasks</p>
+                        <p class="empty-state__tip">✨ <strong>Tip:</strong> Click on tasks to mark them complete</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Simple Todo List Implementation
+        let tasks = [];
+        let taskIdCounter = 1;
+
+        // DOM Elements
+        const taskForm = document.getElementById('taskForm');
+        const taskInput = document.getElementById('taskInput');
+        const taskList = document.getElementById('taskList');
+        const emptyState = document.getElementById('emptyState');
+        const taskSummary = document.getElementById('taskSummary');
+        const completedCount = document.getElementById('completedCount');
+        const totalCount = document.getElementById('totalCount');
+
+        // Task Class
+        class Task {
+            constructor(text) {
+                this.id = taskIdCounter++;
+                this.text = text;
+                this.completed = false;
+            }
+        }
+
+        // Add Task Function
+        function addTask(text) {
+            if (!text.trim()) return;
+            
+            const task = new Task(text.trim());
+            tasks.push(task);
+            renderTasks();
+            saveTasks();
+            taskInput.value = '';
+        }
+
+        // Toggle Task Function
+        function toggleTask(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (task) {
+                task.completed = !task.completed;
+                renderTasks();
+                saveTasks();
+            }
+        }
+
+        // Delete Task Function
+        function deleteTask(taskId) {
+            tasks = tasks.filter(t => t.id !== taskId);
+            renderTasks();
+            saveTasks();
+        }
+
+        // Render Tasks Function
+        function renderTasks() {
+            taskList.innerHTML = '';
+            
+            if (tasks.length === 0) {
+                emptyState.style.display = 'block';
+                taskSummary.style.display = 'none';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            taskSummary.style.display = 'block';
+            
+            // Update summary
+            const completed = tasks.filter(t => t.completed).length;
+            completedCount.textContent = completed;
+            totalCount.textContent = tasks.length;
+
+            // Render each task
+            tasks.forEach(task => {
+                const taskElement = document.createElement('div');
+                taskElement.className = `task-item ${task.completed ? 'completed' : ''}`;
+                taskElement.innerHTML = `
+                    <div class="task-checkbox" onclick="toggleTask(${task.id})"></div>
+                    <span class="task-text" onclick="toggleTask(${task.id})">${escapeHtml(task.text)}</span>
+                    <button class="delete-button" onclick="deleteTask(${task.id})" aria-label="Delete task"></button>
+                `;
+                taskList.appendChild(taskElement);
+            });
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Save to localStorage
+        function saveTasks() {
+            try {
+                localStorage.setItem('todoTasks', JSON.stringify(tasks));
+            } catch (error) {
+                console.error('Failed to save tasks:', error);
+            }
+        }
+
+        // Load from localStorage
+        function loadTasks() {
+            try {
+                const saved = localStorage.getItem('todoTasks');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    tasks = parsed.map(taskData => {
+                        const task = new Task(taskData.text);
+                        task.id = taskData.id;
+                        task.completed = taskData.completed;
+                        return task;
+                    });
+                    taskIdCounter = Math.max(...tasks.map(t => t.id), 0) + 1;
+                }
+            } catch (error) {
+                console.error('Failed to load tasks:', error);
+                tasks = [];
+            }
+        }
+
+        // Event Listeners
+        taskForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            addTask(taskInput.value);
+        });
+
+        // Initialize App
+        function init() {
+            loadTasks();
+            renderTasks();
+            taskInput.focus();
+        }
+
+        // Start the app
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>

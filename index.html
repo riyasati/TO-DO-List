@@ -43,11 +43,27 @@
             </section>
 
             <section class="task-list-section" aria-label="Task list">
+                <div class="task-summary" id="taskSummary" aria-hidden="true">
+                    <p class="task-summary__text">
+                        <span id="completedCount">0</span> of <span id="totalCount">0</span> tasks completed
+                    </p>
+                </div>
                 <div class="task-list" id="taskList" role="list" aria-live="polite">
                     <!-- Tasks will be dynamically inserted here -->
                 </div>
                 <div class="empty-state" id="emptyState" aria-hidden="true">
-                    <p class="empty-state__message">No tasks yet. Add one above to get started!</p>
+                    <div class="empty-state__icon">📝</div>
+                    <h3 class="empty-state__title">No tasks yet</h3>
+                    <p class="empty-state__message">Add your first task above to get started organizing your day!</p>
+                    <div class="empty-state__tips">
+                        <p class="empty-state__tip">💡 <strong>Tip:</strong> Press Enter to quickly add tasks</p>
+                        <p class="empty-state__tip">✨ <strong>Tip:</strong> Click on tasks to mark them complete</p>
+                    </div>
+                </div>
+                
+                <!-- User feedback notifications -->
+                <div class="feedback-container" id="feedbackContainer" aria-live="polite" aria-atomic="true">
+                    <!-- Feedback messages will be inserted here -->
                 </div>
             </section>
         </main>

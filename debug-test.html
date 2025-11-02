@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Todo List</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="header__title">Debug Todo List</h1>
+        </header>
+
+        <main class="main">
+            <section class="input-section">
+                <form class="task-form" id="taskForm">
+                    <div class="input-group">
+                        <input type="text" id="taskInput" class="task-input" placeholder="Enter a new task...">
+                        <button type="submit" class="add-button">Add</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="task-list-section">
+                <div class="task-list" id="taskList" role="list">
+                    <!-- Test task to see if CSS works -->
+                    <div class="task-item">
+                        <div class="task-checkbox"></div>
+                        <span class="task-text">Test task - if you see this, CSS is working</span>
+                        <button class="delete-button"></button>
+                    </div>
+                </div>
+                <div class="empty-state" id="emptyState">
+                    <h3>No tasks yet</h3>
+                    <p>Add your first task above!</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        console.log('Debug script starting...');
+        
+        const taskForm = document.getElementById('taskForm');
+        const taskInput = document.getElementById('taskInput');
+        const taskList = document.getElementById('taskList');
+        const emptyState = document.getElementById('emptyState');
+        
+        console.log('Elements found:', {
+            taskForm: !!taskForm,
+            taskInput: !!taskInput,
+            taskList: !!taskList,
+            emptyState: !!emptyState
+        });
+        
+        // Function to add checkbox functionality to a task
+        function addTaskEventListeners(taskElement) {
+            const checkbox = taskElement.querySelector('.task-checkbox');
+            const taskText = taskElement.querySelector('.task-text');
+            const deleteButton = taskElement.querySelector('.delete-button');
+            
+            // Toggle completion on checkbox or text click
+            function toggleTask() {
+                taskElement.classList.toggle('completed');
+                console.log('Task toggled:', taskElement.classList.contains('completed'));
+            }
+            
+            checkbox.addEventListener('click', toggleTask);
+            taskText.addEventListener('click', toggleTask);
+            
+            // Delete task on delete button click
+            deleteButton.addEventListener('click', function(e) {
+                e.stopPropagation();
+                taskElement.remove();
+                console.log('Task deleted');
+                
+                // Show empty state if no tasks left
+                if (taskList.children.length === 0) {
+                    emptyState.style.display = 'block';
+                }
+            });
+        }
+        
+        // Add functionality to existing test task
+        const existingTask = document.querySelector('.task-item');
+        if (existingTask) {
+            addTaskEventListeners(existingTask);
+        }
+        
+        taskForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const text = taskInput.value.trim();
+            console.log('Form submitted with text:', text);
+            
+            if (text) {
+                // Create a simple task element
+                const taskElement = document.createElement('div');
+                taskElement.className = 'task-item';
+                taskElement.innerHTML = `
+                    <div class="task-checkbox"></div>
+                    <span class="task-text">${text}</span>
+                    <button class="delete-button"></button>
+                `;
+                
+                // Add event listeners to the new task
+                addTaskEventListeners(taskElement);
+                
+                console.log('Adding task element to list');
+                taskList.appendChild(taskElement);
+                
+                // Clear input
+                taskInput.value = '';
+                
+                // Hide empty state
+                emptyState.style.display = 'none';
+                
+                console.log('Task added successfully');
+                console.log('Current taskList children:', taskList.children.length);
+            }
+        });
+    </script>
+</body>
+</html>
